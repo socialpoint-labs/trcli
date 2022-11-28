@@ -37,7 +37,9 @@ class ApiRequestHandler:
         self.environment = environment
         self.client = api_client
         self.suffix = api_client.VERSION
-        self.data_provider = ApiDataProvider(suites_data, environment.case_fields, environment.run_description)
+        self.data_provider = ApiDataProvider(
+            suites_data, environment.case_fields, environment.run_description
+        )
         self.suites_data_from_provider = self.data_provider.suites_input
         self.response_verifier = ApiResponseVerify(verify)
 
@@ -52,7 +54,7 @@ class ApiRequestHandler:
             fields: list = response.response_text
             automation_id_field = next(
                 filter(lambda x: x["system_name"] == "custom_automation_id", fields),
-                None
+                None,
             )
             if automation_id_field:
                 context = automation_id_field["configs"][0]["context"]
@@ -77,9 +79,7 @@ class ApiRequestHandler:
                 projects_data = response.response_text
 
             available_projects = [
-                project
-                for project in projects_data
-                if project["name"] == project_name
+                project for project in projects_data if project["name"] == project_name
             ]
 
             if len(available_projects) == 1:
@@ -147,12 +147,16 @@ class ApiRequestHandler:
         if not response.error_message:
             suites = response.response_text
             suite = next(
-                filter(lambda x: x["name"] == self.suites_data_from_provider.name, suites),
-                None
+                filter(
+                    lambda x: x["name"] == self.suites_data_from_provider.name, suites
+                ),
+                None,
             )
             if suite:
                 suite_id = suite["id"]
-                self.data_provider.update_data([{"suite_id": suite["id"], "name": suite["name"]}])
+                self.data_provider.update_data(
+                    [{"suite_id": suite["id"], "name": suite["name"]}]
+                )
         else:
             error_message = response.error_message
 
@@ -229,16 +233,20 @@ class ApiRequestHandler:
         returned_sections, error_message = self.__get_all_sections(project_id, suite_id)
         if not error_message:
             missing_test_sections = False
-            sections_by_name = {section["name"]: section for section in returned_sections}
+            sections_by_name = {
+                section["name"]: section for section in returned_sections
+            }
             section_data = []
             for section in self.suites_data_from_provider.testsections:
                 if section.name in sections_by_name.keys():
                     section_json = sections_by_name[section.name]
-                    section_data.append({
-                        "section_id": section_json["id"],
-                        "suite_id": section_json["suite_id"],
-                        "name": section_json["name"],
-                    })
+                    section_data.append(
+                        {
+                            "section_id": section_json["id"],
+                            "suite_id": section_json["suite_id"],
+                            "name": section_json["name"],
+                        }
+                    )
                 else:
                     missing_test_sections = True
             self.data_provider.update_data(section_data=section_data)
@@ -294,7 +302,11 @@ class ApiRequestHandler:
             test_cases_by_aut_id = {}
             for case in returned_cases:
                 aut_case_id = case["custom_automation_id"]
-                aut_case_id = aut_case_id if not aut_case_id else html.unescape(case["custom_automation_id"])
+                aut_case_id = (
+                    aut_case_id
+                    if not aut_case_id
+                    else html.unescape(case["custom_automation_id"])
+                )
                 test_cases_by_aut_id[aut_case_id] = case
             test_case_data = []
             missing_cases_number = 0
@@ -302,17 +314,21 @@ class ApiRequestHandler:
                 for test_case in section.testcases:
                     if test_case.custom_automation_id in test_cases_by_aut_id.keys():
                         case = test_cases_by_aut_id[test_case.custom_automation_id]
-                        test_case_data.append({
-                            "case_id": case["id"],
-                            "section_id": case["section_id"],
-                            "title": case["title"],
-                            "custom_automation_id": test_case.custom_automation_id
-                        })
+                        test_case_data.append(
+                            {
+                                "case_id": case["id"],
+                                "section_id": case["section_id"],
+                                "title": case["title"],
+                                "custom_automation_id": test_case.custom_automation_id,
+                            }
+                        )
                     else:
                         missing_cases_number += 1
             self.data_provider.update_data(case_data=test_case_data)
             if missing_cases_number:
-                self.environment.log(f"Found test cases not matching any TestRail case (count: {missing_cases_number})")
+                self.environment.log(
+                    f"Found test cases not matching any TestRail case (count: {missing_cases_number})"
+                )
             return missing_cases_number > 0, error_message
         else:
             return False, error_message
@@ -350,7 +366,7 @@ class ApiRequestHandler:
                 "case_id": response.response_text["id"],
                 "section_id": response.response_text["section_id"],
                 "title": response.response_text["title"],
-                "custom_automation_id": response.response_text["custom_automation_id"]
+                "custom_automation_id": response.response_text["custom_automation_id"],
             }
             for response in responses
         ]
@@ -390,22 +406,41 @@ class ApiRequestHandler:
         response = self.client.send_post(f"add_run/{project_id}", add_run_data)
         return response.response_text.get("id"), response.error_message
 
-    def upload_attachments(self, report_results: [dict], results: list[dict], run_id: int):
-        """ Getting test result id and upload attachments for it. """
+    def upload_attachments(
+        self, report_results: [dict], results: List[dict], run_id: int
+    ):
+        """Getting test result id and upload attachments for it."""
         tests_in_run, error = self.__get_all_tests_in_run(run_id)
         if not error:
             for report_result in report_results:
                 case_id = report_result["case_id"]
-                test_id = next((test["id"] for test in tests_in_run if test["case_id"] == case_id), None)
-                result_id = next((result["id"] for result in results if result["test_id"] == test_id), None)
+                test_id = next(
+                    (test["id"] for test in tests_in_run if test["case_id"] == case_id),
+                    None,
+                )
+                result_id = next(
+                    (
+                        result["id"]
+                        for result in results
+                        if result["test_id"] == test_id
+                    ),
+                    None,
+                )
                 for file_path in report_result.get("attachments"):
                     try:
                         with open(file_path, "rb") as file:
-                            self.client.send_post(f"add_attachment_to_result/{result_id}", files={"attachment": file})
+                            self.client.send_post(
+                                f"add_attachment_to_result/{result_id}",
+                                files={"attachment": file},
+                            )
                     except Exception as ex:
-                        self.environment.elog(f"Error uploading attachment for case {case_id}: {ex}")
+                        self.environment.elog(
+                            f"Error uploading attachment for case {case_id}: {ex}"
+                        )
         else:
-            self.environment.elog(f"Unable to upload attachments due to API request error: {error}")
+            self.environment.elog(
+                f"Unable to upload attachments due to API request error: {error}"
+            )
 
     def add_results(self, run_id: int) -> (dict, str):
         """
@@ -442,11 +477,7 @@ class ApiRequestHandler:
                 # Iterate through futures to get all responses from done tasks (not cancelled)
                 responses = ApiRequestHandler.retrieve_results_after_cancelling(futures)
         responses = [response.response_text for response in responses]
-        results = [
-            result
-            for results_list in responses
-            for result in results_list
-        ]
+        results = [result for results_list in responses for result in results_list]
         report_results_w_attachments = []
         for results_data_chunk in add_results_data_chunks:
             for test_result in results_data_chunk["results"]:
@@ -568,21 +599,27 @@ class ApiRequestHandler:
         Get all cases from all pages
         """
         url = f"get_cases/{project_id}&suite_id={suite_id}"
-        return self.__get_all_entities('cases', f"get_cases/{project_id}&suite_id={suite_id}")
+        return self.__get_all_entities(
+            "cases", f"get_cases/{project_id}&suite_id={suite_id}"
+        )
 
     def __get_all_sections(self, project_id=None, suite_id=None) -> (List[dict], str):
         """
         Get all sections from all pages
         """
-        return self.__get_all_entities('sections', f"get_sections/{project_id}&suite_id={suite_id}")
+        return self.__get_all_entities(
+            "sections", f"get_sections/{project_id}&suite_id={suite_id}"
+        )
 
     def __get_all_tests_in_run(self, run_id=None) -> (List[dict], str):
         """
         Get all tests from all pages
         """
-        return self.__get_all_entities('tests', f"get_tests/{run_id}")
+        return self.__get_all_entities("tests", f"get_tests/{run_id}")
 
-    def __get_all_entities(self, entity: str, link=None, entities=[]) -> (List[dict], str):
+    def __get_all_entities(
+        self, entity: str, link=None, entities=[]
+    ) -> (List[dict], str):
         """
         Get all entities from all pages if number of entities is too big to return in single response.
         Function using next page field in API response.
@@ -598,7 +635,11 @@ class ApiRequestHandler:
             # Endpoints with pagination
             entities = entities + response.response_text[entity]
             if response.response_text["_links"]["next"] is not None:
-                return self.__get_all_entities(entity, link=response.response_text["_links"]["next"], entities=entities)
+                return self.__get_all_entities(
+                    entity,
+                    link=response.response_text["_links"]["next"],
+                    entities=entities,
+                )
             else:
                 return entities, response.error_message
         else:
